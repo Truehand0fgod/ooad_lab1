@@ -1,100 +1,191 @@
 ﻿#include <iostream>
-#include <memory>
 #include <map>
+#include <vector>
 #include <string>
 #include <fstream>
+#include <filesystem>
 
-class Document {
+using namespace std;
+
+class Templ {
 public:
-    std::string name;
-    std::string content;
-    Document() : name(""), content("") {}
-    Document(const std::string& name, const std::string& content)
+    Templ(const string& name, const string& content)
         : name(name), content(content) {}
 
     void display() const {
-        std::cout << "Document: " << name << "\nContent: " << content << "\n";
+        cout << "Document: " << name << "\nContent: " << content << "\n";
     }
 
-    void saveToFile(const std::string& name) const {
-        std::string filename = name + ".txt";
-        std::ofstream file(filename);
+    void saveToFile(const string& name) const {
+        string filename = name + ".txt";
+        ofstream file(filename);
         if (file.is_open()) {
             file << "Document: " << name << "\n";
             file << "Content: " << content << "\n";
             file.close();
-            std::cout << "Document saved to " << filename << "\n";
+            cout << "Document saved to " << filename << "\n";
         }
         else {
-            std::cerr << "Error: Unable to save document.\n";
+            cerr << "Error: Unable to save document.\n";
         }
     }
-    Document createCopy(const Document& original);
+
+    void setDocContent(const string& cont) {
+        this->content = cont;
+    }
+
+private:
+    string name;
+    string content;
 };
-Document Document::createCopy(const Document& original) {
-    return Document(original.name, original.content);
-}
+
+class DocumentManager {
+private:
+    map<string, pair<string, string>> templates;
+
+public:
+    void loadTemplatesFromFiles() {
+        filesystem::path templatesDir = "templates";
+        if (!filesystem::exists(templatesDir)) {
+            filesystem::create_directory(templatesDir);
+        }
+
+        for (const auto& entry : filesystem::directory_iterator(templatesDir)) {
+            if (entry.is_regular_file()) {
+                ifstream file(entry.path());
+                if (file.is_open()) {
+                    string name = entry.path().stem().string();
+                    string content;
+                    getline(file, content);
+                    getline(file, content);
+                    addTemplate(name, content);
+                    file.close();
+                }
+            }
+        }
+    }
+
+    void addTemplate(const string& type, const string& content) {
+        templates[type] = { type, content };
+    }
+
+    Templ createDocument(const string& type) {
+        if (templates.find(type) != templates.end()) {
+            const auto& [name, content] = templates[type];
+            return Templ(name, content);
+        }
+        else {
+            throw invalid_argument("Template for " + type + " not found.");
+        }
+    }
+
+    vector<string> getAvailableTemplates() const {
+        vector<string> types;
+        for (const auto& pair : templates) {
+            types.push_back(pair.first);
+        }
+        return types;
+    }
+
+    void saveTemplateToFile(const string& name, const string& content) {
+        filesystem::path templatesDir = "templates";
+        if (!filesystem::exists(templatesDir)) {
+            filesystem::create_directory(templatesDir);
+        }
+
+        string filename = templatesDir.string() + "/" + name + ".txt";
+        ofstream file(filename);
+        if (file.is_open()) {
+            file << "Document: " << name << "\n";
+            file << "Content: " << content << "\n";
+            file.close();
+            cout << "Template saved to " << filename << "\n";
+        }
+        else {
+            cerr << "Error: Unable to save template.\n";
+        }
+    }
+};
 
 int main() {
-    Document reportTemplate("Monthly Report", "This is a report template.");
-    Document articleTemplate("Tech Article", "This is an article template.");
-    Document contractTemplate("Service Contract", "This is a contract template.");
+    DocumentManager manager;
 
-    std::map<std::string, Document> templates = {
-        {"Report", reportTemplate},
-        {"Article", articleTemplate},
-        {"Contract", contractTemplate}
-    };
-
-    std::cout << "Available document templates:\n";
-    for (const auto& temp : templates) {
-        std::cout << "- " << temp.first << "\n";
-    }
+    manager.loadTemplatesFromFiles();
 
     while (true) {
-        std::cout << "\nEnter the type of document to create (or 'exit' to quit): ";
-        std::string choice;
-        std::cin >> choice;
+        cout << "\nAvailable commands:\n";
+        cout << "1. List templates\n";
+        cout << "2. Create document from template\n";
+        cout << "3. Add new template\n";
+        cout << "4. Exit\n";
+        cout << "Enter command: ";
+        int command;
+        cin >> command;
 
-        if (choice == "exit") {
+        if (command == 1) {
+            cout << "Available templates:\n";
+            for (const auto& type : manager.getAvailableTemplates()) {
+                cout << "- " << type << "\n";
+            }
+        }
+        else if (command == 2) {
+            cout << "Enter template name: ";
+            string choice;
+            cin >> choice;
+
+            try {
+                Templ document = manager.createDocument(choice);
+                cout << "\nNew document created:\n";
+                document.display();
+
+                cout << "\nDo you want to edit the content? (yes/no): ";
+                string edit;
+                cin >> edit;
+
+                if (edit == "yes") {
+                    cout << "Enter new content: ";
+                    cin.ignore();
+                    string docContent;
+                    getline(cin, docContent);
+                    document.setDocContent(docContent);
+                    cout << "\nUpdated document:\n";
+                    document.display();
+                }
+
+                cout << "\nDo you want to save this document to a file? (yes/no): ";
+                string save;
+                cin >> save;
+
+                if (save == "yes") {
+                    string filename;
+                    cout << "Enter filename: ";
+                    cin >> filename;
+                    document.saveToFile(filename);
+                }
+            }
+            catch (const invalid_argument& e) {
+                cerr << e.what() << "\n";
+            }
+        }
+        else if (command == 3) {
+            cout << "Enter template name: ";
+            string name;
+            cin >> name;
+
+            cout << "Enter template content: ";
+            cin.ignore();
+            string content;
+            getline(cin, content);
+
+            manager.saveTemplateToFile(name, content);
+            manager.addTemplate(name, content);
+            cout << "Template added successfully.\n";
+        }
+        else if (command == 4) {
             break;
         }
-
-        try {
-            if (templates.find(choice) == templates.end()) {
-                throw std::invalid_argument("Template for " + choice + " not found.");
-            }
-
-            Document document;
-            document.createCopy(templates[choice]);
-            std::cout << "\nNew document created:\n";
-            document.display();
-
-            std::cout << "\nDo you want to edit the content? (yes/no): ";
-            std::string edit;
-            std::cin >> edit;
-
-            if (edit == "yes") {
-                std::cout << "Enter new content: ";
-                std::cin.ignore();
-                std::getline(std::cin, document.content);
-                std::cout << "\nUpdated document:\n";
-                document.display();
-            }
-
-            std::cout << "\nDo you want to save this document to a file? (yes/no): ";
-            std::string save;
-            std::cin >> save;
-
-            if (save == "yes") {
-                std::cout << "Enter filename: ";
-                std::string filename;
-                std::cin >> filename;
-                document.saveToFile(filename);
-            }
-        }
-        catch (const std::invalid_argument& e) {
-            std::cerr << e.what() << "\n";
+        else {
+            cout << "Invalid command. Try again.\n";
         }
     }
 

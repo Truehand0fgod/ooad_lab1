@@ -8,17 +8,14 @@
 
 using namespace std;
 
-class Document {
+class Templ {
 public:
-    string name;
-    string content;
-
-    Document(const string& name, const string& content)
+    Templ(const string& name, const string& content)
         : name(name), content(content) {}
 
-    virtual ~Document() = default;
-
-    virtual shared_ptr<Document> clone() const = 0;
+    shared_ptr<Templ> clone() const  {
+        return make_shared<Templ>(*this);
+    }
 
     void display() const {
         cout << "Document: " << name << "\nContent: " << content << "\n";
@@ -37,41 +34,18 @@ public:
             cerr << "Error: Unable to save document.\n";
         }
     }
-};
-
-class Report : public Document {
-public:
-    Report(const string& name, const string& content)
-        : Document(name, content) {}
-
-    shared_ptr<Document> clone() const override {
-        return make_shared<Report>(*this);
+    void setDocContent(const string& cont)
+    {
+        this->content = cont;
     }
-};
-
-class Article : public Document {
-public:
-    Article(const string& name, const string& content)
-        : Document(name, content) {}
-
-    shared_ptr<Document> clone() const override {
-        return make_shared<Article>(*this);
-    }
-};
-
-class Contract : public Document {
-public:
-    Contract(const string& name, const string& content)
-        : Document(name, content) {}
-
-    shared_ptr<Document> clone() const override {
-        return make_shared<Contract>(*this);
-    }
+private:
+    string name;
+    string content;
 };
 
 class DocumentManager {
 private:
-    map<string, shared_ptr<Document>> templates;
+    map<string, shared_ptr<Templ>> templates;
 
 public:
     void loadTemplatesFromFiles() {
@@ -88,18 +62,18 @@ public:
                     string content;
                     getline(file, content); 
                     getline(file, content);
-                    addTemplate(name, make_shared<Report>(name, content));
+                    addTemplate(name, make_shared<Templ>(name, content));
                     file.close();
                 }
             }
         }
     }
 
-    void addTemplate(const string& type, const shared_ptr<Document>& document) {
-        templates[type] = document;
+    void addTemplate(const string& type, const shared_ptr<Templ>& content) {
+        templates[type] = content;
     }
 
-    shared_ptr<Document> createDocument(const string& type) {
+    shared_ptr<Templ> createDocument(const string& type) {
         if (templates.find(type) != templates.end()) {
             return templates[type]->clone();
         }
@@ -174,7 +148,9 @@ int main() {
                 if (edit == "yes") {
                     cout << "Enter new content: ";
                     cin.ignore();
-                    getline(cin, document->content);
+                    string docContent;
+                    getline(cin, docContent);
+                    document->setDocContent(docContent);
                     cout << "\nUpdated document:\n";
                     document->display();
                 }
@@ -205,7 +181,7 @@ int main() {
             getline(cin, content);
 
             manager.saveTemplateToFile(name, content);
-            manager.addTemplate(name, make_shared<Report>(name, content));
+            manager.addTemplate(name, make_shared<Templ>(name, content));
             cout << "Template added successfully.\n";
         }
         else if (command == 4) {
